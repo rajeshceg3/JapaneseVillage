@@ -1,0 +1,104 @@
+import * as THREE from 'https://esm.sh/three@0.168.0';
+
+const CHUNK = 80;
+const VIEW = 3;
+const SEED = 20260802;
+const biomes = [
+  { name: 'Cedar Shrine Valley', ground: 0x5f7f49, fog: 0xbad7ce, accent: 0xb52d2d, tree: 'cedar', mood: 'bell wind through cedar gates' },
+  { name: 'Rice Terrace Morning', ground: 0x84aa68, fog: 0xd4edd1, accent: 0xf2d16b, tree: 'willow', mood: 'water mirrors and footpaths' },
+  { name: 'Bamboo Mist Grove', ground: 0x4e8b55, fog: 0xb8ddd3, accent: 0x82c47d, tree: 'bamboo', mood: 'tall bamboo corridors' },
+  { name: 'Sakura Riverside', ground: 0x6e9358, fog: 0xf3d4df, accent: 0xf0a6bd, tree: 'sakura', mood: 'petals drifting over bridges' },
+  { name: 'Snow Lantern Ridge', ground: 0xdfe9e6, fog: 0xd8e9f4, accent: 0xffcf77, tree: 'pine', mood: 'quiet snow and warm paper light' },
+  { name: 'Firefly Tea Hamlet', ground: 0x536f3d, fog: 0xa9c4a9, accent: 0xffe891, tree: 'cedar', mood: 'tea houses under fireflies' },
+];
+
+function hash(x, z) { const n = Math.sin(x * 127.1 + z * 311.7 + SEED) * 43758.5453; return n - Math.floor(n); }
+function smooth(t) { return t * t * (3 - 2 * t); }
+function noise(x, z) {
+  const ix = Math.floor(x), iz = Math.floor(z), fx = smooth(x - ix), fz = smooth(z - iz);
+  const a = hash(ix, iz), b = hash(ix + 1, iz), c = hash(ix, iz + 1), d = hash(ix + 1, iz + 1);
+  return THREE.MathUtils.lerp(THREE.MathUtils.lerp(a, b, fx), THREE.MathUtils.lerp(c, d, fx), fz);
+}
+function fbm(x, z) { let v = 0, amp = .55, f = 1; for (let i = 0; i < 5; i++) { v += noise(x * f, z * f) * amp; f *= 2.03; amp *= .48; } return v; }
+function biomeAt(z) { return biomes[Math.abs(Math.floor((z + 280) / 220)) % biomes.length]; }
+function heightAt(x, z) {
+  const ridge = Math.pow(Math.max(0, fbm(x * .006, z * .006) - .42), 2.2) * 92;
+  const hills = (fbm(x * .022, z * .022) - .48) * 18;
+  const riverCarve = Math.max(0, 1 - Math.abs(riverCenter(z) - x) / 32) * 9;
+  return ridge + hills - riverCarve;
+}
+function riverCenter(z) { return Math.sin(z * .008) * 58 + Math.sin(z * .021) * 21; }
+
+function boot() {
+  const root = document.getElementById('root');
+  const biomeLabel = document.getElementById('biome');
+  const chunkLabel = document.getElementById('chunks');
+  const moodLabel = document.getElementById('mood');
+  const scene = new THREE.Scene();
+  scene.fog = new THREE.FogExp2(0xbad7ce, 0.0052);
+  const camera = new THREE.PerspectiveCamera(72, innerWidth / innerHeight, .1, 1600);
+  camera.position.set(0, 20, 44);
+  const renderer = new THREE.WebGLRenderer({ antialias: true, powerPreference: 'high-performance' });
+  renderer.setSize(innerWidth, innerHeight); renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
+  renderer.shadowMap.enabled = true; renderer.shadowMap.type = THREE.PCFSoftShadowMap; renderer.toneMapping = THREE.ACESFilmicToneMapping; renderer.toneMappingExposure = 1.06;
+  root.appendChild(renderer.domElement);
+
+  const hemi = new THREE.HemisphereLight(0xfff4da, 0x203b4b, 1.9); scene.add(hemi);
+  const sun = new THREE.DirectionalLight(0xffd39c, 3.2); sun.position.set(-120, 160, 80); sun.castShadow = true; sun.shadow.mapSize.set(2048, 2048); scene.add(sun);
+  const sky = new THREE.Mesh(new THREE.SphereGeometry(950, 48, 24), new THREE.ShaderMaterial({ side: THREE.BackSide, uniforms: { t: { value: 0 } }, vertexShader: 'varying vec3 v;void main(){v=position;gl_Position=projectionMatrix*modelViewMatrix*vec4(position,1.0);}', fragmentShader: 'varying vec3 v;uniform float t;void main(){float h=normalize(v).y*.5+.5;vec3 dawn=vec3(1.,.78,.55);vec3 zen=vec3(.34,.62,.88);vec3 night=vec3(.05,.08,.18);vec3 col=mix(dawn,zen,smoothstep(.15,1.,h));col=mix(col,night,smoothstep(.72,1.,sin(t)*.5+.5)*.35);gl_FragColor=vec4(col,1.);}' })); scene.add(sky);
+
+  const mats = {
+    trunk: new THREE.MeshStandardMaterial({ color: 0x56351f, roughness: .92 }), roof: new THREE.MeshStandardMaterial({ color: 0x213444, roughness: .78 }), wood: new THREE.MeshStandardMaterial({ color: 0x8c5b36, roughness: .85 }),
+    paper: new THREE.MeshStandardMaterial({ color: 0xfff1d2, emissive: 0xffbd66, emissiveIntensity: .55 }), water: new THREE.MeshPhysicalMaterial({ color: 0x59b4c8, transparent: true, opacity: .68, roughness: .05, metalness: 0, transmission: .25 }),
+    stone: new THREE.MeshStandardMaterial({ color: 0x8f9288, roughness: 1 }), path: new THREE.MeshStandardMaterial({ color: 0xb29b74, roughness: 1 }), snow: new THREE.MeshStandardMaterial({ color: 0xf0f7f4, roughness: .75 }),
+  };
+  const chunks = new Map(); const fireflies = []; const petals = []; const birds = []; const keys = {};
+
+  function addHouse(g, x, z, b) { const y = heightAt(x, z) + 1.7; const body = new THREE.Mesh(new THREE.BoxGeometry(10, 5, 8), mats.wood); body.position.set(x, y, z); body.castShadow = body.receiveShadow = true; g.add(body); const roof = new THREE.Mesh(new THREE.ConeGeometry(8, 4, 4), mats.roof); roof.position.set(x, y + 4.4, z); roof.rotation.y = Math.PI / 4; roof.castShadow = true; g.add(roof); const door = new THREE.Mesh(new THREE.BoxGeometry(2, 2.7, .18), mats.paper); door.position.set(x, y + .25, z + 4.1); g.add(door); if (hash(x, z) > .58) addTorii(g, x + 9, z - 8, b.accent); }
+  function addTorii(g, x, z, color) { const mat = new THREE.MeshStandardMaterial({ color, roughness: .55 }); [[0,4,0,1,8,1],[-3,0,0,1,9,1],[3,0,0,1,9,1],[0,8,0,9,1,1],[0,10,0,11,1,1]].forEach(p => { const m = new THREE.Mesh(new THREE.BoxGeometry(p[3], p[4], p[5]), mat); m.position.set(x + p[0], heightAt(x, z) + p[1], z + p[2]); m.castShadow = true; g.add(m); }); }
+  function addTree(g, x, z, kind, accent) { const y = heightAt(x, z); const trunk = new THREE.Mesh(new THREE.CylinderGeometry(.32, .72, kind === 'bamboo' ? 9 : 5, 8), mats.trunk); trunk.position.set(x, y + trunk.geometry.parameters.height / 2, z); trunk.castShadow = true; g.add(trunk); const color = kind === 'sakura' ? accent : kind === 'bamboo' ? 0x3f9d47 : kind === 'pine' ? 0x1a4b3b : 0x205d3c; const geo = kind === 'bamboo' ? new THREE.CylinderGeometry(.8, 1.15, 8, 8) : new THREE.ConeGeometry(kind === 'sakura' ? 4.3 : 3.6, kind === 'pine' ? 9 : 7.5, 10); const leaf = new THREE.Mesh(geo, new THREE.MeshStandardMaterial({ color, roughness: .82 })); leaf.position.set(x, y + (kind === 'bamboo' ? 11 : 7.4), z); leaf.castShadow = true; g.add(leaf); }
+  function addLantern(g, x, z) { const y = heightAt(x, z); const pole = new THREE.Mesh(new THREE.CylinderGeometry(.12, .12, 3, 8), mats.stone); pole.position.set(x, y + 1.5, z); g.add(pole); const light = new THREE.PointLight(0xffc76a, 1.35, 28); light.position.set(x, y + 3.25, z); g.add(light); const box = new THREE.Mesh(new THREE.BoxGeometry(1, 1.1, 1), mats.paper); box.position.copy(light.position); g.add(box); }
+  function addBridge(g, x, z) { const y = Math.max(heightAt(x - 13, z), heightAt(x + 13, z)) + 1.2; const deck = new THREE.Mesh(new THREE.BoxGeometry(32, 1.1, 5), mats.wood); deck.position.set(x, y, z); deck.rotation.z = .08; deck.castShadow = true; g.add(deck); for (const sx of [-13, 13]) { const rail = new THREE.Mesh(new THREE.BoxGeometry(1, 3, 6), mats.wood); rail.position.set(x + sx, y + 1.8, z); g.add(rail); } }
+  function addTerraces(g, worldX, worldZ) { for (let i = 0; i < 7; i++) { const terrace = new THREE.Mesh(new THREE.BoxGeometry(CHUNK * .82, .3, 3.4), new THREE.MeshStandardMaterial({ color: 0x94d47a, roughness: .8 })); terrace.position.set(worldX, heightAt(worldX, worldZ) + .5 + i * .62, worldZ - 27 + i * 8); terrace.receiveShadow = true; g.add(terrace); } }
+
+  function makeChunk(cx, cz) {
+    const key = `${cx},${cz}`; if (chunks.has(key)) return;
+    const g = new THREE.Group(); const worldX = cx * CHUNK, worldZ = cz * CHUNK, b = biomeAt(worldZ);
+    const geo = new THREE.PlaneGeometry(CHUNK, CHUNK, 32, 32); geo.rotateX(-Math.PI / 2); const arr = geo.attributes.position.array;
+    for (let i = 0; i < arr.length; i += 3) arr[i + 1] = heightAt(arr[i] + worldX, arr[i + 2] + worldZ);
+    geo.computeVertexNormals(); const groundMat = new THREE.MeshStandardMaterial({ color: b.name.includes('Snow') ? mats.snow.color : b.ground, roughness: .96 }); const ground = new THREE.Mesh(geo, groundMat); ground.position.set(worldX, 0, worldZ); ground.receiveShadow = true; g.add(ground);
+    const localRiver = riverCenter(worldZ); if (Math.abs(worldX - localRiver) < CHUNK * .85) { const water = new THREE.Mesh(new THREE.PlaneGeometry(24, CHUNK), mats.water); water.rotateX(-Math.PI / 2); water.position.set(localRiver, .9, worldZ); g.add(water); if (hash(cx, cz) > .52) addBridge(g, localRiver, worldZ + (hash(cz, cx) - .5) * 40); }
+    const path = new THREE.Mesh(new THREE.PlaneGeometry(6, CHUNK * 1.1), mats.path); path.rotateX(-Math.PI / 2); path.position.set(worldX + Math.sin(cz * .4) * 16, heightAt(worldX, worldZ) + .12, worldZ); path.rotation.z = Math.sin(cz * .7) * .12; g.add(path);
+    for (let i = 0; i < 48; i++) { const x = worldX + (hash(i + cx * 9, cz) - .5) * CHUNK, z = worldZ + (hash(cx, i + cz * 7) - .5) * CHUNK; if (Math.abs(x - riverCenter(z)) < 16) continue; if (hash(x, z) < .13) addHouse(g, x, z, b); else addTree(g, x, z, b.tree, b.accent); }
+    for (let i = 0; i < 10; i++) if (hash(cx * 31 + i, cz) > .42) addLantern(g, worldX + (i - 4.5) * 8, worldZ + Math.sin(i + cz) * 13);
+    if (hash(cx, cz) > .84) addTorii(g, worldX, worldZ, b.accent); if (b.name.includes('Rice')) addTerraces(g, worldX, worldZ);
+    chunks.set(key, g); scene.add(g); updateHud(b);
+  }
+  function updateHud(b) { biomeLabel.textContent = b.name; moodLabel.textContent = b.mood; chunkLabel.textContent = `Streaming ${chunks.size} procedural chunks · ${Math.round(camera.position.z)}m into the frontier`; }
+
+  addEventListener('keydown', e => { keys[e.key.toLowerCase()] = true; if (e.key.toLowerCase() === 'm') document.body.classList.toggle('zen'); });
+  addEventListener('keyup', e => keys[e.key.toLowerCase()] = false);
+  renderer.domElement.addEventListener('click', () => renderer.domElement.requestPointerLock?.());
+  addEventListener('mousemove', e => { if (document.pointerLockElement === renderer.domElement) yaw -= e.movementX * .0022; });
+  for (let i = 0; i < 90; i++) { const bird = new THREE.Mesh(new THREE.ConeGeometry(.7, 2.2, 3), new THREE.MeshStandardMaterial({ color: 0x1b2028 })); bird.position.set((hash(i, 1) - .5) * 480, 58 + hash(i, 2) * 55, (hash(i, 3) - .5) * 540); birds.push(bird); scene.add(bird); }
+  for (let i = 0; i < 160; i++) { const p = new THREE.Mesh(new THREE.SphereGeometry(.08 + hash(i, 4) * .1, 6, 4), new THREE.MeshBasicMaterial({ color: i % 2 ? 0xffe891 : 0xf0a6bd, transparent: true, opacity: .75 })); p.position.set((hash(i, 5) - .5) * 240, 8 + hash(i, 6) * 40, (hash(i, 7) - .5) * 260); (i % 2 ? fireflies : petals).push(p); scene.add(p); }
+
+  let yaw = 0, t = 0;
+  function tick() {
+    requestAnimationFrame(tick); t += .01; sky.material.uniforms.t.value = t;
+    if (keys['a']) yaw += .025; if (keys['d']) yaw -= .025;
+    const forward = new THREE.Vector3(Math.sin(yaw), 0, Math.cos(yaw)); const side = new THREE.Vector3(Math.cos(yaw), 0, -Math.sin(yaw)); const sprint = keys['shift'] ? 1.7 : 1;
+    if (keys['w'] || keys['arrowup']) camera.position.addScaledVector(forward, .82 * sprint); if (keys['s']) camera.position.addScaledVector(forward, -.55); if (keys['q']) camera.position.addScaledVector(side, -.55); if (keys['e']) camera.position.addScaledVector(side, .55);
+    camera.position.y = THREE.MathUtils.lerp(camera.position.y, heightAt(camera.position.x, camera.position.z) + 18 + Math.sin(t * 2) * .35, .065); camera.lookAt(camera.position.x + Math.sin(yaw) * 44, camera.position.y - 7, camera.position.z + Math.cos(yaw) * 44);
+    const cx = Math.floor(camera.position.x / CHUNK), cz = Math.floor(camera.position.z / CHUNK); for (let x = cx - VIEW; x <= cx + VIEW; x++) for (let z = cz - VIEW; z <= cz + VIEW; z++) makeChunk(x, z);
+    for (const [k, g] of chunks) { const [x, z] = k.split(',').map(Number); if (Math.abs(x - cx) > VIEW + 1 || Math.abs(z - cz) > VIEW + 1) { scene.remove(g); chunks.delete(k); } }
+    const b = biomeAt(camera.position.z); updateHud(b); scene.fog.color.lerp(new THREE.Color(b.fog), .012); renderer.setClearColor(scene.fog.color);
+    birds.forEach((bird, i) => { bird.position.x += Math.sin(t + i) * .08; bird.position.z += .26; if (bird.position.z - camera.position.z > 280) bird.position.z -= 560; bird.rotation.y = Math.sin(t + i); });
+    fireflies.forEach((p, i) => { p.position.x += Math.sin(t * 2 + i) * .018; p.position.y += Math.sin(t * 3 + i) * .012; p.position.z += .18; if (p.position.z - camera.position.z > 130) p.position.z -= 260; p.material.opacity = .35 + Math.sin(t * 4 + i) * .25; });
+    petals.forEach((p, i) => { p.position.x += Math.sin(t + i) * .04; p.position.y -= .012; p.position.z += .1; if (p.position.y < heightAt(p.position.x, p.position.z) + 2) p.position.y += 42; if (p.position.z - camera.position.z > 130) p.position.z -= 260; });
+    renderer.render(scene, camera);
+  }
+  tick();
+  addEventListener('resize', () => { camera.aspect = innerWidth / innerHeight; camera.updateProjectionMatrix(); renderer.setSize(innerWidth, innerHeight); });
+}
+boot();

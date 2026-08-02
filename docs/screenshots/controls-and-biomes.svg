@@ -1,0 +1,18 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1600 900" role="img" aria-labelledby="title desc">
+  <title id="title">Japanese Village Frontier controls and biome screenshot</title>
+  <desc id="desc">Annotated application screenshot focused on pointer-lock controls, zen HUD, biome progression, particles, and open-source remix points.</desc>
+  <defs><linearGradient id="bg" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#101a25"/><stop offset="0.5" stop-color="#315a50"/><stop offset="1" stop-color="#f0a6bd"/></linearGradient></defs>
+  <rect width="1600" height="900" fill="url(#bg)"/>
+  <path d="M0 620 C280 520 520 580 760 500 C1040 410 1250 495 1600 410 L1600 900 L0 900Z" fill="#496e3d"/>
+  <path d="M0 760 C360 650 620 750 930 620 C1160 525 1380 565 1600 505 L1600 900 L0 900Z" fill="#233f31" opacity="0.9"/>
+  <g opacity="0.9"><circle cx="310" cy="210" r="5" fill="#ffe891"/><circle cx="340" cy="270" r="4" fill="#ffe891"/><circle cx="1240" cy="250" r="5" fill="#f0a6bd"/><circle cx="1320" cy="310" r="4" fill="#f0a6bd"/><circle cx="980" cy="190" r="5" fill="#ffe891"/><circle cx="870" cy="280" r="4" fill="#ffe891"/></g>
+  <rect x="90" y="85" width="560" height="350" rx="34" fill="#101b22dd" stroke="#ffffff55"/>
+  <text x="130" y="145" fill="#fff8e8" font-family="Inter, Arial" font-size="42" font-weight="800">Immersive controls</text>
+  <g font-family="Inter, Arial" fill="#fff8e8" font-size="28"><text x="135" y="210">W/S: drift forward + back</text><text x="135" y="260">A/D: turn through the valley</text><text x="135" y="310">Q/E: sidestep along paths</text><text x="135" y="360">Shift: glide faster</text><text x="135" y="410">Click: pointer-lock mouse look</text></g>
+  <rect x="760" y="90" width="660" height="420" rx="34" fill="#fff8e8e8"/>
+  <text x="800" y="150" fill="#17232b" font-family="Inter, Arial" font-size="40" font-weight="900">Biome progression</text>
+  <g font-family="Inter, Arial" font-size="25" fill="#17232b"><text x="815" y="210">1 Cedar Shrine Valley</text><text x="815" y="255">2 Rice Terrace Morning</text><text x="815" y="300">3 Bamboo Mist Grove</text><text x="815" y="345">4 Sakura Riverside</text><text x="815" y="390">5 Snow Lantern Ridge</text><text x="815" y="435">6 Firefly Tea Hamlet</text></g>
+  <g stroke-width="7" stroke-linecap="round"><path d="M790 565 C930 505 1060 645 1210 575 C1320 525 1420 570 1500 515" fill="none" stroke="#59b4c8"/><path d="M720 660 C860 600 1040 700 1210 620 C1330 565 1440 630 1570 560" fill="none" stroke="#b99b72"/></g>
+  <g fill="#ffe0a0" stroke="#51351f" stroke-width="6"><rect x="905" y="640" width="32" height="42" rx="5"/><line x1="921" y1="640" x2="921" y2="595"/><rect x="1235" y="580" width="32" height="42" rx="5"/><line x1="1251" y1="580" x2="1251" y2="535"/></g>
+  <g font-family="Inter, Arial" font-size="24" font-weight="800" fill="#fff8e8"><path d="M610 405 l150 70" stroke="#fff8e8" stroke-width="4"/><text x="570" y="500">HUD can fade into Zen mode with M</text><path d="M1270 580 l-70 -90" stroke="#fff8e8" stroke-width="4"/><text x="1090" y="730">Particles add fireflies + petals</text><path d="M935 635 l-95 95" stroke="#fff8e8" stroke-width="4"/><text x="640" y="790">Open static files are easy to remix</text></g>
+</svg>
