@@ -1,0 +1,32 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1600 900" role="img" aria-labelledby="title desc">
+  <title id="title">Japanese Village Frontier overview screenshot</title>
+  <desc id="desc">Annotated application screenshot showing the procedural Japanese village world, HUD, river, lantern path, torii, trees, and streamed frontier biomes.</desc>
+  <defs>
+    <linearGradient id="sky" x1="0" y1="0" x2="0" y2="1"><stop stop-color="#74aee2"/><stop offset="0.55" stop-color="#ffd7b5"/><stop offset="1" stop-color="#9fcdb4"/></linearGradient>
+    <linearGradient id="ground" x1="0" y1="0" x2="0" y2="1"><stop stop-color="#7ea562"/><stop offset="1" stop-color="#355736"/></linearGradient>
+    <filter id="soft"><feGaussianBlur stdDeviation="8"/></filter>
+  </defs>
+  <rect width="1600" height="900" fill="url(#sky)"/>
+  <circle cx="1230" cy="135" r="58" fill="#ffe1a2" opacity="0.9"/>
+  <path d="M0 470 C260 345 430 430 620 330 C820 215 1030 400 1210 300 C1360 225 1460 300 1600 250 L1600 900 L0 900 Z" fill="#6a855f" opacity="0.62"/>
+  <path d="M0 560 C280 440 380 530 630 430 C840 345 1050 490 1260 390 C1415 315 1510 385 1600 350 L1600 900 L0 900 Z" fill="url(#ground)"/>
+  <path d="M735 470 C700 560 820 615 740 705 C680 775 760 835 720 900 L925 900 C950 812 845 770 895 690 C950 600 840 560 880 470 Z" fill="#58b6cd" opacity="0.78"/>
+  <path d="M550 730 C675 670 795 655 935 625 C1050 600 1160 570 1280 530" fill="none" stroke="#b99b72" stroke-width="20" opacity="0.88"/>
+  <g fill="#8d5b36" stroke="#51351f" stroke-width="4"><rect x="415" y="555" width="78" height="48"/><polygon points="400,555 533,555 466,510" fill="#223444"/><rect x="780" y="535" width="82" height="52"/><polygon points="762,535 884,535 822,492" fill="#223444"/><rect x="1110" y="470" width="80" height="50"/><polygon points="1094,470 1204,470 1149,430" fill="#223444"/></g>
+  <g stroke="#bd2f2e" stroke-width="14" fill="none" stroke-linecap="square"><path d="M1015 465 v-82 M1075 465 v-82 M990 382 h110 M1002 352 h86"/></g>
+  <g fill="#225c3b"><path d="M270 612 l36 -105 l36 105z"/><path d="M325 575 l32 -92 l32 92z"/><path d="M1290 515 l34 -96 l34 96z"/><path d="M1375 485 l28 -80 l28 80z"/></g>
+  <g fill="#ef9eba"><circle cx="610" cy="535" r="36"/><circle cx="650" cy="525" r="30"/><circle cx="590" cy="570" r="28"/></g>
+  <g fill="#ffd985" stroke="#6b543b" stroke-width="5"><rect x="600" y="650" width="22" height="28" rx="3"/><line x1="611" y1="650" x2="611" y2="615"/><rect x="950" y="600" width="22" height="28" rx="3"/><line x1="961" y1="600" x2="961" y2="565"/><rect x="1195" y="540" width="22" height="28" rx="3"/><line x1="1206" y1="540" x2="1206" y2="505"/></g>
+  <rect x="36" y="34" width="520" height="184" rx="28" fill="#17232bcc" stroke="#ffffff55"/>
+  <text x="70" y="78" fill="#bfe7d0" font-family="Inter, Arial" font-size="18" font-weight="700" letter-spacing="4">OPEN-SOURCE ZEN FRONTIER</text>
+  <text x="70" y="120" fill="#fff8e8" font-family="Inter, Arial" font-size="38" font-weight="800">Japanese Village Frontier</text>
+  <text x="70" y="158" fill="#ffd88f" font-family="Inter, Arial" font-size="25" font-weight="800">Sakura Riverside</text>
+  <text x="70" y="193" fill="#fff8e8" font-family="Georgia" font-size="21" opacity="0.82">petals drifting over bridges</text>
+  <g font-family="Inter, Arial" font-size="22" font-weight="700" fill="#10202b">
+    <path d="M1180 210 l-110 95" stroke="#10202b" stroke-width="4"/><rect x="1188" y="170" width="330" height="62" rx="18" fill="#fff8e8dd"/><text x="1210" y="210">Biome fog + dynamic sky</text>
+    <path d="M1010 640 l-95 -60" stroke="#10202b" stroke-width="4"/><rect x="1020" y="625" width="395" height="62" rx="18" fill="#fff8e8dd"/><text x="1042" y="665">River-carved streamed chunks</text>
+    <path d="M1010 440 l-62 10" stroke="#10202b" stroke-width="4"/><rect x="1120" y="360" width="300" height="62" rx="18" fill="#fff8e8dd"/><text x="1142" y="400">Torii + village landmarks</text>
+    <path d="M610 645 l-100 -45" stroke="#10202b" stroke-width="4"/><rect x="210" y="715" width="385" height="62" rx="18" fill="#fff8e8dd"/><text x="232" y="755">Lantern path guides exploration</text>
+  </g>
+  <rect width="1600" height="900" fill="#000" opacity="0.08"/>
+</svg>

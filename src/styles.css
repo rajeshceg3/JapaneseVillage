@@ -1,0 +1,13 @@
+:root { color-scheme: dark; font-family: Inter, ui-sans-serif, system-ui, -apple-system, Segoe UI, sans-serif; }
+* { box-sizing: border-box; }
+body { margin: 0; overflow: hidden; background: #0f1720; cursor: crosshair; }
+.world, canvas { width: 100vw; height: 100vh; display: block; }
+.hud { position: fixed; left: 24px; top: 24px; max-width: 610px; padding: 20px 22px; color: #fff8e8; border: 1px solid rgba(255,255,255,.24); border-radius: 26px; background: linear-gradient(135deg, rgba(16,27,32,.74), rgba(82,49,36,.43)); backdrop-filter: blur(20px); box-shadow: 0 24px 80px rgba(0,0,0,.32); letter-spacing: .01em; transition: opacity .4s ease, transform .4s ease; }
+.eyebrow { margin: 0 0 4px; color: #bfe7d0; font-size: .72rem; font-weight: 800; letter-spacing: .22em; text-transform: uppercase; }
+.hud b { display: block; font-size: clamp(1.25rem, 2.6vw, 2.25rem); text-shadow: 0 2px 18px rgba(255,210,150,.55); }
+.hud span { display: block; margin: 8px 0 3px; color: #ffd88f; font-weight: 800; }
+.hud em { display: block; margin-bottom: 10px; color: rgba(255,248,232,.78); font-family: Georgia, serif; }
+.hud small { display: block; line-height: 1.48; color: rgba(255,248,232,.88); }
+.vignette { pointer-events: none; position: fixed; inset: 0; background: radial-gradient(circle at 50% 45%, transparent 45%, rgba(8,12,18,.28) 100%); mix-blend-mode: multiply; }
+.zen .hud { opacity: .18; transform: translateY(-10px); }
+@media (max-width: 640px) { .hud { left: 12px; right: 12px; top: 12px; padding: 16px; } }
