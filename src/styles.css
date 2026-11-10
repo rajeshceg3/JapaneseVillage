@@ -11,3 +11,10 @@ body { margin: 0; overflow: hidden; background: #0f1720; cursor: crosshair; }
 .vignette { pointer-events: none; position: fixed; inset: 0; background: radial-gradient(circle at 50% 45%, transparent 45%, rgba(8,12,18,.28) 100%); mix-blend-mode: multiply; }
 .zen .hud { opacity: .18; transform: translateY(-10px); }
 @media (max-width: 640px) { .hud { left: 12px; right: 12px; top: 12px; padding: 16px; } }
+
+.hud { background: #162c25; backdrop-filter: none; color: #fff8e7; }
+.places { position: fixed; z-index: 5; bottom: 16px; left: 16px; right: 16px; display: flex; flex-wrap: wrap; gap: 6px; }
+.places button { color: #fff8e7; background: #162c25; border: 1px solid #a9c4a9; border-radius: 24px; font: 600 13px system-ui; padding: 12px 15px; min-height: 44px; cursor: pointer; }
+.places button:focus-visible { outline: 3px solid #fff8e7; outline-offset: 3px; }
+canvas { touch-action: none; }
+@media (max-width: 600px) { .hud { padding: 14px 16px; } .hud small { display: none; } .hud em { font-size: 14px; } .places button { padding: 10px 12px; } }
