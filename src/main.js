@@ -129,6 +129,7 @@ function boot() {
     if (!reducedMotion.matches) birds.forEach((bird, i) => { bird.position.x += Math.sin(t + i) * .08; bird.position.z += .26; if (bird.position.z - camera.position.z > 280) bird.position.z -= 560; bird.rotation.y = Math.sin(t + i); });
     if (!reducedMotion.matches) fireflies.forEach((p, i) => { p.position.x += Math.sin(t * 2 + i) * .018; p.position.y += Math.sin(t * 3 + i) * .012; p.position.z += .18; if (p.position.z - camera.position.z > 130) p.position.z -= 260; p.material.opacity = .35 + Math.sin(t * 4 + i) * .25; });
     if (!reducedMotion.matches) petals.forEach((p, i) => { p.position.x += Math.sin(t + i) * .04; p.position.y -= .012; p.position.z += .1; if (p.position.y < heightAt(p.position.x, p.position.z) + 2) p.position.y += 42; if (p.position.z - camera.position.z > 130) p.position.z -= 260; });
+    sky.position.copy(camera.position);
     const nearest = [...lanternPositions.values()].flat().sort((a,b) => a.distanceToSquared(camera.position) - b.distanceToSquared(camera.position));
     lightPool.forEach((light, i) => { light.visible = Boolean(nearest[i]); if (nearest[i]) light.position.copy(nearest[i]); });
     renderer.domElement.dataset.camera = camera.position.toArray().map(n => n.toFixed(1)).join(',');
