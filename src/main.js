@@ -52,14 +52,33 @@ function boot() {
     paper: new THREE.MeshStandardMaterial({ color: 0xfff1d2, emissive: 0xffbd66, emissiveIntensity: .55 }), water: new THREE.MeshPhysicalMaterial({ color: 0x59b4c8, transparent: true, opacity: .68, roughness: .05, metalness: 0, transmission: .25 }),
     stone: new THREE.MeshStandardMaterial({ color: 0x8f9288, roughness: 1 }), path: new THREE.MeshStandardMaterial({ color: 0xb29b74, roughness: 1 }), snow: new THREE.MeshStandardMaterial({ color: 0xf0f7f4, roughness: .75 }),
   };
+  // Lantern meshes remain in every chunk; only the eight nearest need real
+  // dynamic lights. Hundreds of simultaneous PointLights compile oversized
+  // shaders and make even the first scene stall.
+  const lanternPositions = new Map();
+  const lightPool = Array.from({ length: 8 }, () => { const light = new THREE.PointLight(0xffc76a, 1.35, 28); scene.add(light); return light; });
   const chunks = new Map(); const fireflies = []; const petals = []; const birds = []; const keys = {};
 
   function addHouse(g, x, z, b) { const y = heightAt(x, z) + 1.7; const body = new THREE.Mesh(new THREE.BoxGeometry(10, 5, 8), mats.wood); body.position.set(x, y, z); body.castShadow = body.receiveShadow = true; g.add(body); const roof = new THREE.Mesh(new THREE.ConeGeometry(8, 4, 4), mats.roof); roof.position.set(x, y + 4.4, z); roof.rotation.y = Math.PI / 4; roof.castShadow = true; g.add(roof); const door = new THREE.Mesh(new THREE.BoxGeometry(2, 2.7, .18), mats.paper); door.position.set(x, y + .25, z + 4.1); g.add(door); if (hash(x, z) > .58) addTorii(g, x + 9, z - 8, b.accent); }
   function addTorii(g, x, z, color) { const mat = new THREE.MeshStandardMaterial({ color, roughness: .55 }); [[0,4,0,1,8,1],[-3,0,0,1,9,1],[3,0,0,1,9,1],[0,8,0,9,1,1],[0,10,0,11,1,1]].forEach(p => { const m = new THREE.Mesh(new THREE.BoxGeometry(p[3], p[4], p[5]), mat); m.position.set(x + p[0], heightAt(x, z) + p[1], z + p[2]); m.castShadow = true; g.add(m); }); }
   function addTree(g, x, z, kind, accent) { const y = heightAt(x, z); const trunk = new THREE.Mesh(new THREE.CylinderGeometry(.32, .72, kind === 'bamboo' ? 9 : 5, 8), mats.trunk); trunk.position.set(x, y + trunk.geometry.parameters.height / 2, z); trunk.castShadow = true; g.add(trunk); const color = kind === 'sakura' ? accent : kind === 'bamboo' ? 0x3f9d47 : kind === 'pine' ? 0x1a4b3b : 0x205d3c; const geo = kind === 'bamboo' ? new THREE.CylinderGeometry(.8, 1.15, 8, 8) : new THREE.ConeGeometry(kind === 'sakura' ? 4.3 : 3.6, kind === 'pine' ? 9 : 7.5, 10); const leaf = new THREE.Mesh(geo, new THREE.MeshStandardMaterial({ color, roughness: .82 })); leaf.position.set(x, y + (kind === 'bamboo' ? 11 : 7.4), z); leaf.castShadow = true; g.add(leaf); }
-  function addLantern(g, x, z) { const y = heightAt(x, z); const pole = new THREE.Mesh(new THREE.CylinderGeometry(.12, .12, 3, 8), mats.stone); pole.position.set(x, y + 1.5, z); g.add(pole); const light = new THREE.PointLight(0xffc76a, 1.35, 28); light.position.set(x, y + 3.25, z); g.add(light); const box = new THREE.Mesh(new THREE.BoxGeometry(1, 1.1, 1), mats.paper); box.position.copy(light.position); g.add(box); }
+  function addLantern(g, x, z) { const y = heightAt(x, z); const pole = new THREE.Mesh(new THREE.CylinderGeometry(.12, .12, 3, 8), mats.stone); pole.position.set(x, y + 1.5, z); g.add(pole); const lightPosition = new THREE.Vector3(x, y + 3.25, z); if (!lanternPositions.has(g)) lanternPositions.set(g, []); lanternPositions.get(g).push(lightPosition); const box = new THREE.Mesh(new THREE.BoxGeometry(1, 1.1, 1), mats.paper); box.position.copy(lightPosition); g.add(box); }
   function addBridge(g, x, z) { const y = Math.max(heightAt(x - 13, z), heightAt(x + 13, z)) + 1.2; const deck = new THREE.Mesh(new THREE.BoxGeometry(32, 1.1, 5), mats.wood); deck.position.set(x, y, z); deck.rotation.z = .08; deck.castShadow = true; g.add(deck); for (const sx of [-13, 13]) { const rail = new THREE.Mesh(new THREE.BoxGeometry(1, 3, 6), mats.wood); rail.position.set(x + sx, y + 1.8, z); g.add(rail); } }
-  function addTerraces(g, worldX, worldZ) { for (let i = 0; i < 7; i++) { const terrace = new THREE.Mesh(new THREE.BoxGeometry(CHUNK * .82, .3, 3.4), new THREE.MeshStandardMaterial({ color: 0x94d47a, roughness: .8 })); terrace.position.set(worldX, heightAt(worldX, worldZ) + .5 + i * .62, worldZ - 27 + i * 8); terrace.receiveShadow = true; g.add(terrace); } }
+  function addTerraces(g, worldX, worldZ) {
+    for (let row = 0; row < 7; row++) {
+      const z = worldZ - 25 + row * 8;
+      const geometry = new THREE.PlaneGeometry(CHUNK * .72, 5, 16, 2);
+      geometry.rotateX(-Math.PI / 2);
+      const positions = geometry.attributes.position;
+      for (let i = 0; i < positions.count; i++) {
+        const x = positions.getX(i) + worldX, worldZPoint = positions.getZ(i) + z;
+        positions.setXYZ(i, x, heightAt(x, worldZPoint) + .18, worldZPoint);
+      }
+      geometry.computeVertexNormals();
+      const terrace = new THREE.Mesh(geometry, new THREE.MeshStandardMaterial({ color: row % 2 ? 0x74a35d : 0x8bb56a, roughness: .35, metalness: .08 }));
+      terrace.receiveShadow = true; g.add(terrace);
+    }
+  }
 
   function makeChunk(cx, cz) {
     const key = `${cx},${cz}`; if (chunks.has(key)) return;
@@ -69,7 +88,7 @@ function boot() {
     geo.computeVertexNormals(); const groundMat = new THREE.MeshStandardMaterial({ color: b.name.includes('Snow') ? mats.snow.color : b.ground, roughness: .96 }); const ground = new THREE.Mesh(geo, groundMat); ground.position.set(worldX, 0, worldZ); ground.receiveShadow = true; g.add(ground);
     const localRiver = riverCenter(worldZ); if (Math.abs(worldX - localRiver) < CHUNK * .85) { const water = new THREE.Mesh(new THREE.PlaneGeometry(24, CHUNK), mats.water); water.rotateX(-Math.PI / 2); water.position.set(localRiver, .9, worldZ); g.add(water); if (hash(cx, cz) > .52) addBridge(g, localRiver, worldZ + (hash(cz, cx) - .5) * 40); }
     const path = new THREE.Mesh(new THREE.PlaneGeometry(6, CHUNK * 1.1), mats.path); path.rotateX(-Math.PI / 2); path.position.set(worldX + Math.sin(cz * .4) * 16, heightAt(worldX, worldZ) + .12, worldZ); path.rotation.z = Math.sin(cz * .7) * .12; g.add(path);
-    for (let i = 0; i < 48; i++) { const x = worldX + (hash(i + cx * 9, cz) - .5) * CHUNK, z = worldZ + (hash(cx, i + cz * 7) - .5) * CHUNK; if (Math.abs(x - riverCenter(z)) < 16) continue; if (hash(x, z) < .13) addHouse(g, x, z, b); else addTree(g, x, z, b.tree, b.accent); }
+    for (let i = 0; i < 48; i++) { const x = worldX + (hash(i + cx * 9, cz) - .5) * CHUNK, z = worldZ + (hash(cx, i + cz * 7) - .5) * CHUNK; if (Math.abs(x - riverCenter(z)) < 16 || (b.name.includes('Rice') && Math.abs(x - worldX) < CHUNK * .38 && Math.abs(z - worldZ) < 31)) continue; if (hash(x, z) < .13) addHouse(g, x, z, b); else addTree(g, x, z, b.tree, b.accent); }
     for (let i = 0; i < 10; i++) if (hash(cx * 31 + i, cz) > .42) addLantern(g, worldX + (i - 4.5) * 8, worldZ + Math.sin(i + cz) * 13);
     if (hash(cx, cz) > .84) addTorii(g, worldX, worldZ, b.accent); if (b.name.includes('Rice')) addTerraces(g, worldX, worldZ);
     chunks.set(key, g); scene.add(g); updateHud(b);
@@ -83,19 +102,38 @@ function boot() {
   for (let i = 0; i < 90; i++) { const bird = new THREE.Mesh(new THREE.ConeGeometry(.7, 2.2, 3), new THREE.MeshStandardMaterial({ color: 0x1b2028 })); bird.position.set((hash(i, 1) - .5) * 480, 58 + hash(i, 2) * 55, (hash(i, 3) - .5) * 540); birds.push(bird); scene.add(bird); }
   for (let i = 0; i < 160; i++) { const p = new THREE.Mesh(new THREE.SphereGeometry(.08 + hash(i, 4) * .1, 6, 4), new THREE.MeshBasicMaterial({ color: i % 2 ? 0xffe891 : 0xf0a6bd, transparent: true, opacity: .75 })); p.position.set((hash(i, 5) - .5) * 240, 8 + hash(i, 6) * 40, (hash(i, 7) - .5) * 260); (i % 2 ? fireflies : petals).push(p); scene.add(p); }
 
-  let yaw = 0, t = 0;
+  let yaw = 0, t = 0, lastFrame = performance.now();
+  const reducedMotion = matchMedia('(prefers-reduced-motion: reduce)');
+  const places = document.createElement('nav'); places.className = 'places'; places.setAttribute('aria-label', 'Visit a landscape');
+  places.innerHTML = ['Shrine', 'Rice', 'Bamboo', 'Sakura', 'Snow', 'Tea'].map((name, i) => `<button data-place="${i}">${name}</button>`).join('') + '<button id="reset-view">Reset view</button>';
+  document.body.appendChild(places);
+  function visit(index) { camera.position.set(0, heightAt(0, -170 + index * 220) + 18, -170 + index * 220); yaw = 0; }
+  places.querySelectorAll('[data-place]').forEach(button => button.addEventListener('click', () => visit(Number(button.dataset.place))));
+  document.getElementById('reset-view').addEventListener('click', () => { camera.position.set(0,20,44); yaw = 0; });
+  let lastTouch = null;
+  renderer.domElement.addEventListener('pointerdown', e => { if(e.pointerType === 'touch') { lastTouch = e.clientX; renderer.domElement.setPointerCapture(e.pointerId); } });
+  renderer.domElement.addEventListener('pointermove', e => { if(lastTouch !== null) { yaw -= (e.clientX - lastTouch) * .006; lastTouch = e.clientX; } });
+  renderer.domElement.addEventListener('pointerup', () => lastTouch = null);
+  renderer.domElement.addEventListener('pointercancel', () => lastTouch = null);
+  addEventListener('blur', () => { for(const key in keys) keys[key] = false; lastTouch = null; });
   function tick() {
-    requestAnimationFrame(tick); t += .01; sky.material.uniforms.t.value = t;
-    if (keys['a']) yaw += .025; if (keys['d']) yaw -= .025;
+    requestAnimationFrame(tick); const now = performance.now(); const frameScale = Math.min(.05, (now - lastFrame) / 1000) * 60; lastFrame = now;
+    if (!reducedMotion.matches) t += .01 * frameScale; sky.material.uniforms.t.value = t;
+    if (keys['a']) yaw += .025 * frameScale; if (keys['d']) yaw -= .025 * frameScale;
     const forward = new THREE.Vector3(Math.sin(yaw), 0, Math.cos(yaw)); const side = new THREE.Vector3(Math.cos(yaw), 0, -Math.sin(yaw)); const sprint = keys['shift'] ? 1.7 : 1;
-    if (keys['w'] || keys['arrowup']) camera.position.addScaledVector(forward, .82 * sprint); if (keys['s']) camera.position.addScaledVector(forward, -.55); if (keys['q']) camera.position.addScaledVector(side, -.55); if (keys['e']) camera.position.addScaledVector(side, .55);
+    if (keys['w'] || keys['arrowup']) camera.position.addScaledVector(forward, .82 * sprint * frameScale); if (keys['s']) camera.position.addScaledVector(forward, -.55 * frameScale); if (keys['q']) camera.position.addScaledVector(side, -.55 * frameScale); if (keys['e']) camera.position.addScaledVector(side, .55 * frameScale);
     camera.position.y = THREE.MathUtils.lerp(camera.position.y, heightAt(camera.position.x, camera.position.z) + 18 + Math.sin(t * 2) * .35, .065); camera.lookAt(camera.position.x + Math.sin(yaw) * 44, camera.position.y - 7, camera.position.z + Math.cos(yaw) * 44);
     const cx = Math.floor(camera.position.x / CHUNK), cz = Math.floor(camera.position.z / CHUNK); for (let x = cx - VIEW; x <= cx + VIEW; x++) for (let z = cz - VIEW; z <= cz + VIEW; z++) makeChunk(x, z);
-    for (const [k, g] of chunks) { const [x, z] = k.split(',').map(Number); if (Math.abs(x - cx) > VIEW + 1 || Math.abs(z - cz) > VIEW + 1) { scene.remove(g); chunks.delete(k); } }
+    for (const [k, g] of chunks) { const [x, z] = k.split(',').map(Number); if (Math.abs(x - cx) > VIEW + 1 || Math.abs(z - cz) > VIEW + 1) { scene.remove(g); chunks.delete(k); lanternPositions.delete(g); g.traverse(object => { if (object.isMesh) { object.geometry.dispose(); if (!Object.values(mats).includes(object.material)) object.material.dispose(); } }); } }
     const b = biomeAt(camera.position.z); updateHud(b); scene.fog.color.lerp(new THREE.Color(b.fog), .012); renderer.setClearColor(scene.fog.color);
-    birds.forEach((bird, i) => { bird.position.x += Math.sin(t + i) * .08; bird.position.z += .26; if (bird.position.z - camera.position.z > 280) bird.position.z -= 560; bird.rotation.y = Math.sin(t + i); });
-    fireflies.forEach((p, i) => { p.position.x += Math.sin(t * 2 + i) * .018; p.position.y += Math.sin(t * 3 + i) * .012; p.position.z += .18; if (p.position.z - camera.position.z > 130) p.position.z -= 260; p.material.opacity = .35 + Math.sin(t * 4 + i) * .25; });
-    petals.forEach((p, i) => { p.position.x += Math.sin(t + i) * .04; p.position.y -= .012; p.position.z += .1; if (p.position.y < heightAt(p.position.x, p.position.z) + 2) p.position.y += 42; if (p.position.z - camera.position.z > 130) p.position.z -= 260; });
+    if (!reducedMotion.matches) birds.forEach((bird, i) => { bird.position.x += Math.sin(t + i) * .08; bird.position.z += .26; if (bird.position.z - camera.position.z > 280) bird.position.z -= 560; bird.rotation.y = Math.sin(t + i); });
+    if (!reducedMotion.matches) fireflies.forEach((p, i) => { p.position.x += Math.sin(t * 2 + i) * .018; p.position.y += Math.sin(t * 3 + i) * .012; p.position.z += .18; if (p.position.z - camera.position.z > 130) p.position.z -= 260; p.material.opacity = .35 + Math.sin(t * 4 + i) * .25; });
+    if (!reducedMotion.matches) petals.forEach((p, i) => { p.position.x += Math.sin(t + i) * .04; p.position.y -= .012; p.position.z += .1; if (p.position.y < heightAt(p.position.x, p.position.z) + 2) p.position.y += 42; if (p.position.z - camera.position.z > 130) p.position.z -= 260; });
+    const nearest = [...lanternPositions.values()].flat().sort((a,b) => a.distanceToSquared(camera.position) - b.distanceToSquared(camera.position));
+    lightPool.forEach((light, i) => { light.visible = Boolean(nearest[i]); if (nearest[i]) light.position.copy(nearest[i]); });
+    renderer.domElement.dataset.camera = camera.position.toArray().map(n => n.toFixed(1)).join(',');
+    renderer.domElement.dataset.chunks = String(chunks.size);
+    renderer.domElement.dataset.activeLights = String(lightPool.filter(light => light.visible).length);
     renderer.render(scene, camera);
   }
   tick();
