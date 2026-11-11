@@ -5,7 +5,7 @@
     "test": "node scripts/audio-structure.cjs && node scripts/browser-gate.cjs && npm run build"
   },
   "devDependencies": {
-    "puppeteer-core": "25.17.0"
+    "puppeteer-core": "^25.17.0"
   },
   "type": "module"
 }
