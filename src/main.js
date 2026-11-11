@@ -1,3 +1,5 @@
+import {createSoundscape} from './soundscape.js';
+import {SOUND_PLACES} from './sound-places.js';
 import * as THREE from 'https://esm.sh/three@0.168.0';
 
 const CHUNK = 80;
@@ -30,6 +32,8 @@ function heightAt(x, z) {
 function riverCenter(z) { return Math.sin(z * .008) * 58 + Math.sin(z * .021) * 21; }
 
 function boot() {
+  const ambience=createSoundscape(SOUND_PLACES);window.villageSound=ambience;
+  let soundPlace=biomes.indexOf(biomeAt(44));
   const root = document.getElementById('root');
   const biomeLabel = document.getElementById('biome');
   const chunkLabel = document.getElementById('chunks');
@@ -105,8 +109,9 @@ function boot() {
   let yaw = 0, t = 0, lastFrame = performance.now();
   const reducedMotion = matchMedia('(prefers-reduced-motion: reduce)');
   const places = document.createElement('nav'); places.className = 'places'; places.setAttribute('aria-label', 'Visit a landscape');
-  places.innerHTML = ['Shrine', 'Rice', 'Bamboo', 'Sakura', 'Snow', 'Tea'].map((name, i) => `<button data-place="${i}">${name}</button>`).join('') + '<button id="reset-view">Reset view</button>';
+  places.innerHTML = ['Shrine', 'Rice', 'Bamboo', 'Sakura', 'Snow', 'Tea'].map((name, i) => `<button data-place="${i}">${name}</button>`).join('') + '<button id="reset-view">Reset view</button><button id="sound" aria-pressed="false">Sound on</button>';
   document.body.appendChild(places);
+  document.getElementById('sound').onclick=()=>{const on=ambience.toggle(soundPlace);const b=document.getElementById('sound');b.textContent=on?'Sound off':'Sound on';b.setAttribute('aria-pressed',String(on))};
   function visit(index) { camera.position.set(0, heightAt(0, -170 + index * 220) + 18, -170 + index * 220); yaw = 0; }
   places.querySelectorAll('[data-place]').forEach(button => button.addEventListener('click', () => visit(Number(button.dataset.place))));
   document.getElementById('reset-view').addEventListener('click', () => { camera.position.set(0,20,44); yaw = 0; });
@@ -125,7 +130,7 @@ function boot() {
     camera.position.y = THREE.MathUtils.lerp(camera.position.y, heightAt(camera.position.x, camera.position.z) + 18 + Math.sin(t * 2) * .35, .065); camera.lookAt(camera.position.x + Math.sin(yaw) * 44, camera.position.y - 7, camera.position.z + Math.cos(yaw) * 44);
     const cx = Math.floor(camera.position.x / CHUNK), cz = Math.floor(camera.position.z / CHUNK); for (let x = cx - VIEW; x <= cx + VIEW; x++) for (let z = cz - VIEW; z <= cz + VIEW; z++) makeChunk(x, z);
     for (const [k, g] of chunks) { const [x, z] = k.split(',').map(Number); if (Math.abs(x - cx) > VIEW + 1 || Math.abs(z - cz) > VIEW + 1) { scene.remove(g); chunks.delete(k); lanternPositions.delete(g); g.traverse(object => { if (object.isMesh) { object.geometry.dispose(); if (!Object.values(mats).includes(object.material)) object.material.dispose(); } }); } }
-    const b = biomeAt(camera.position.z); updateHud(b); scene.fog.color.lerp(new THREE.Color(b.fog), .012); renderer.setClearColor(scene.fog.color);
+    const b = biomeAt(camera.position.z); const nextPlace=biomes.indexOf(b);if(nextPlace!==soundPlace){soundPlace=nextPlace;ambience.setPlace(soundPlace)} updateHud(b); scene.fog.color.lerp(new THREE.Color(b.fog), .012); renderer.setClearColor(scene.fog.color);
     if (!reducedMotion.matches) birds.forEach((bird, i) => { bird.position.x += Math.sin(t + i) * .08; bird.position.z += .26; if (bird.position.z - camera.position.z > 280) bird.position.z -= 560; bird.rotation.y = Math.sin(t + i); });
     if (!reducedMotion.matches) fireflies.forEach((p, i) => { p.position.x += Math.sin(t * 2 + i) * .018; p.position.y += Math.sin(t * 3 + i) * .012; p.position.z += .18; if (p.position.z - camera.position.z > 130) p.position.z -= 260; p.material.opacity = .35 + Math.sin(t * 4 + i) * .25; });
     if (!reducedMotion.matches) petals.forEach((p, i) => { p.position.x += Math.sin(t + i) * .04; p.position.y -= .012; p.position.z += .1; if (p.position.y < heightAt(p.position.x, p.position.z) + 2) p.position.y += 42; if (p.position.z - camera.position.z > 130) p.position.z -= 260; });
