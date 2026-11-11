@@ -1,8 +1,11 @@
 {
   "scripts": {
     "dev": "python3 -m http.server 5173",
-    "build": "node scripts/validate-static-site.mjs"
+    "build": "node scripts/validate-static-site.mjs",
+    "test": "node scripts/audio-structure.cjs && node scripts/browser-gate.cjs && npm run build"
   },
-  "dependencies": {},
-  "devDependencies": {}
+  "devDependencies": {
+    "puppeteer-core": "25.17.0"
+  },
+  "type": "module"
 }
