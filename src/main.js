@@ -1,6 +1,7 @@
 import {createSoundscape} from './soundscape.js';
 import {SOUND_PLACES} from './sound-places.js';
 import * as THREE from 'https://esm.sh/three@0.168.0';
+import { mergeGeometries } from 'https://esm.sh/three@0.168.0/examples/jsm/utils/BufferGeometryUtils.js';
 
 const CHUNK = 80;
 const VIEW = 3;
@@ -59,14 +60,95 @@ function boot() {
   // Lantern meshes remain in every chunk; only the eight nearest need real
   // dynamic lights. Hundreds of simultaneous PointLights compile oversized
   // shaders and make even the first scene stall.
+  const treeMat = new THREE.MeshStandardMaterial({ vertexColors: true, roughness: .85 });
+  function paintGeo(geo, bottom, top) {
+    const cb = new THREE.Color(bottom), ct = new THREE.Color(top === undefined ? bottom : top), tmp = new THREE.Color();
+    const pos = geo.attributes.position, colors = new Float32Array(pos.count * 3);
+    let min = Infinity, max = -Infinity;
+    for (let i = 0; i < pos.count; i++) { const y = pos.getY(i); if (y < min) min = y; if (y > max) max = y; }
+    for (let i = 0; i < pos.count; i++) { const k = max > min ? (pos.getY(i) - min) / (max - min) : 0; tmp.copy(cb).lerp(ct, k); colors[i * 3] = tmp.r; colors[i * 3 + 1] = tmp.g; colors[i * 3 + 2] = tmp.b; }
+    geo.setAttribute('color', new THREE.BufferAttribute(colors, 3));
+    return geo;
+  }
   const lanternPositions = new Map();
   const lightPool = Array.from({ length: 8 }, () => { const light = new THREE.PointLight(0xffc76a, 1.35, 28); scene.add(light); return light; });
   const chunks = new Map(); const fireflies = []; const petals = []; const birds = []; const keys = {};
 
-  function addHouse(g, x, z, b) { const y = heightAt(x, z) + 1.7; const body = new THREE.Mesh(new THREE.BoxGeometry(10, 5, 8), mats.wood); body.position.set(x, y, z); body.castShadow = body.receiveShadow = true; g.add(body); const roof = new THREE.Mesh(new THREE.ConeGeometry(8, 4, 4), mats.roof); roof.position.set(x, y + 4.4, z); roof.rotation.y = Math.PI / 4; roof.castShadow = true; g.add(roof); const door = new THREE.Mesh(new THREE.BoxGeometry(2, 2.7, .18), mats.paper); door.position.set(x, y + .25, z + 4.1); g.add(door); if (hash(x, z) > .58) addTorii(g, x + 9, z - 8, b.accent); }
-  function addTorii(g, x, z, color) { const mat = new THREE.MeshStandardMaterial({ color, roughness: .55 }); [[0,4,0,1,8,1],[-3,0,0,1,9,1],[3,0,0,1,9,1],[0,8,0,9,1,1],[0,10,0,11,1,1]].forEach(p => { const m = new THREE.Mesh(new THREE.BoxGeometry(p[3], p[4], p[5]), mat); m.position.set(x + p[0], heightAt(x, z) + p[1], z + p[2]); m.castShadow = true; g.add(m); }); }
-  function addTree(g, x, z, kind, accent) { const y = heightAt(x, z); const trunk = new THREE.Mesh(new THREE.CylinderGeometry(.32, .72, kind === 'bamboo' ? 9 : 5, 8), mats.trunk); trunk.position.set(x, y + trunk.geometry.parameters.height / 2, z); trunk.castShadow = true; g.add(trunk); const color = kind === 'sakura' ? accent : kind === 'bamboo' ? 0x3f9d47 : kind === 'pine' ? 0x1a4b3b : 0x205d3c; const geo = kind === 'bamboo' ? new THREE.CylinderGeometry(.8, 1.15, 8, 8) : new THREE.ConeGeometry(kind === 'sakura' ? 4.3 : 3.6, kind === 'pine' ? 9 : 7.5, 10); const leaf = new THREE.Mesh(geo, new THREE.MeshStandardMaterial({ color, roughness: .82 })); leaf.position.set(x, y + (kind === 'bamboo' ? 11 : 7.4), z); leaf.castShadow = true; g.add(leaf); }
-  function addLantern(g, x, z) { const y = heightAt(x, z); const pole = new THREE.Mesh(new THREE.CylinderGeometry(.12, .12, 3, 8), mats.stone); pole.position.set(x, y + 1.5, z); g.add(pole); const lightPosition = new THREE.Vector3(x, y + 3.25, z); if (!lanternPositions.has(g)) lanternPositions.set(g, []); lanternPositions.get(g).push(lightPosition); const box = new THREE.Mesh(new THREE.BoxGeometry(1, 1.1, 1), mats.paper); box.position.copy(lightPosition); g.add(box); }
+  function addHouse(g, x, z, b) {
+    const y = heightAt(x, z) + 1.7;
+    const body = new THREE.Mesh(new THREE.BoxGeometry(10, 5, 8), mats.wood);
+    body.position.set(x, y, z); body.castShadow = body.receiveShadow = true; g.add(body);
+    // Kirizuma-style gabled roof with eaves overhang, ridge along the long axis
+    const tri = new THREE.Shape([new THREE.Vector2(-4.9, 0), new THREE.Vector2(4.9, 0), new THREE.Vector2(0, 3.0)]);
+    const roofGeo = new THREE.ExtrudeGeometry(tri, { depth: 11.4, bevelEnabled: false });
+    roofGeo.rotateY(Math.PI / 2);
+    roofGeo.translate(-5.7, 0, 0);
+    const roof = new THREE.Mesh(roofGeo, mats.roof);
+    roof.position.set(x, y + 2.5, z); roof.castShadow = true; g.add(roof);
+    const door = new THREE.Mesh(new THREE.BoxGeometry(2, 2.7, .18), mats.paper);
+    door.position.set(x, y + .25, z + 4.1); g.add(door);
+    if (hash(x, z) > .58) addTorii(g, x + 9, z - 8, b.accent);
+  }
+  function addTorii(g, x, z, color) {
+    const mat = new THREE.MeshStandardMaterial({ color, roughness: .55 });
+    const y = heightAt(x, z);
+    const parts = [
+      { geo: new THREE.CylinderGeometry(.42, .52, 8.2, 10), pos: [-2.9, 4.1, 0], rot: [0, 0, .045] },
+      { geo: new THREE.CylinderGeometry(.42, .52, 8.2, 10), pos: [2.9, 4.1, 0], rot: [0, 0, -.045] },
+      { geo: new THREE.BoxGeometry(7.0, .55, .6), pos: [0, 5.9, 0] },
+      { geo: new THREE.BoxGeometry(9.2, .8, .8), pos: [0, 8.0, 0] },
+      { geo: new THREE.BoxGeometry(8.0, .55, .7), pos: [0, 8.68, 0] },
+      { geo: new THREE.BoxGeometry(1.5, .8, .8), pos: [-4.9, 8.35, 0], rot: [0, 0, .28] },
+      { geo: new THREE.BoxGeometry(1.5, .8, .8), pos: [4.9, 8.35, 0], rot: [0, 0, -.28] },
+    ];
+    for (const p of parts) { const m = new THREE.Mesh(p.geo, mat); m.position.set(x + p.pos[0], y + p.pos[1], z + p.pos[2]); if (p.rot) m.rotation.set(p.rot[0], p.rot[1], p.rot[2]); m.castShadow = true; g.add(m); }
+  }
+  function addTree(g, x, z, kind, accent) {
+    const y = heightAt(x, z);
+    const parts = [];
+    const trunkH = kind === 'bamboo' ? 9 : 5;
+    const trunk = new THREE.CylinderGeometry(.32, .72, trunkH, 8);
+    trunk.translate(x, y + trunkH / 2, z);
+    paintGeo(trunk, kind === 'bamboo' ? 0x35853e : 0x4a2e1a, kind === 'bamboo' ? 0x5cbf6c : 0x6b4a2c);
+    parts.push(trunk);
+    if (kind === 'sakura') {
+      const c1 = new THREE.IcosahedronGeometry(3.1, 1); c1.translate(x, y + 8.2, z); paintGeo(c1, 0xd98ba4, accent);
+      const c2 = new THREE.IcosahedronGeometry(2.3, 1); c2.translate(x + 1.7, y + 9.4, z + .8); paintGeo(c2, 0xe3a3b8, 0xf6c7d4);
+      const c3 = new THREE.IcosahedronGeometry(1.8, 1); c3.translate(x - 1.6, y + 9.0, z - .9); paintGeo(c3, 0xd98ba4, 0xf0b6c6);
+      parts.push(c1, c2, c3);
+    } else if (kind === 'bamboo') {
+      const b2 = new THREE.CylinderGeometry(.22, .3, 7.5, 6); b2.translate(x + .9, y + 3.75, z + .5); paintGeo(b2, 0x2f7d38, 0x57b567);
+      const b3 = new THREE.CylinderGeometry(.18, .26, 6.4, 6); b3.translate(x - .8, y + 3.2, z - .4); paintGeo(b3, 0x2f7d38, 0x4fae5e);
+      const t1 = new THREE.ConeGeometry(1.5, 2.6, 7); t1.translate(x, y + 9.8, z); paintGeo(t1, 0x2c7034, 0x49a355);
+      const t2 = new THREE.ConeGeometry(1.2, 2.1, 7); t2.translate(x + .9, y + 8.2, z + .5); paintGeo(t2, 0x2c7034, 0x49a355);
+      parts.push(b2, b3, t1, t2);
+    } else if (kind === 'willow') {
+      const top = new THREE.ConeGeometry(3.9, 4.6, 9); top.translate(x, y + 8.6, z); paintGeo(top, 0x4d7a40, 0x7fae62);
+      const skirt = new THREE.ConeGeometry(4.4, 5.2, 9); skirt.translate(x, y + 6.2, z); paintGeo(skirt, 0x40682f, 0x5d8a48);
+      parts.push(top, skirt);
+    } else {
+      const base = kind === 'pine' ? 0x14402f : 0x1a4c33, tip = kind === 'pine' ? 0x2c6a4e : 0x35795a;
+      const l1 = new THREE.ConeGeometry(3.7, 4.4, 10); l1.translate(x, y + 6.4, z); paintGeo(l1, base, tip);
+      const l2 = new THREE.ConeGeometry(2.9, 3.8, 10); l2.translate(x, y + 9.2, z); paintGeo(l2, base, tip);
+      const l3 = new THREE.ConeGeometry(2.0, 3.2, 10); l3.translate(x, y + 11.6, z); paintGeo(l3, base, tip);
+      parts.push(l1, l2, l3);
+    }
+    const geos = parts.map(p => p.index ? p.toNonIndexed() : p);
+    const tree = new THREE.Mesh(mergeGeometries(geos, false), treeMat);
+    tree.castShadow = true;
+    g.add(tree);
+  }
+  function addLantern(g, x, z) {
+    const y = heightAt(x, z);
+    const base = new THREE.Mesh(new THREE.BoxGeometry(.9, .35, .9), mats.stone); base.position.set(x, y + .17, z); g.add(base);
+    const pole = new THREE.Mesh(new THREE.CylinderGeometry(.12, .16, 1.7, 8), mats.stone); pole.position.set(x, y + 1.2, z); g.add(pole);
+    const platform = new THREE.Mesh(new THREE.BoxGeometry(.75, .18, .75), mats.stone); platform.position.set(x, y + 2.12, z); g.add(platform);
+    const lightPosition = new THREE.Vector3(x, y + 2.58, z);
+    if (!lanternPositions.has(g)) lanternPositions.set(g, []);
+    lanternPositions.get(g).push(lightPosition);
+    const box = new THREE.Mesh(new THREE.BoxGeometry(.62, .68, .62), mats.paper); box.position.copy(lightPosition); g.add(box);
+    const cap = new THREE.Mesh(new THREE.ConeGeometry(.66, .5, 4), mats.stone); cap.position.set(x, y + 3.16, z); cap.rotation.y = Math.PI / 4; g.add(cap);
+  }
   function addBridge(g, x, z) { const y = Math.max(heightAt(x - 13, z), heightAt(x + 13, z)) + 1.2; const deck = new THREE.Mesh(new THREE.BoxGeometry(32, 1.1, 5), mats.wood); deck.position.set(x, y, z); deck.rotation.z = .08; deck.castShadow = true; g.add(deck); for (const sx of [-13, 13]) { const rail = new THREE.Mesh(new THREE.BoxGeometry(1, 3, 6), mats.wood); rail.position.set(x + sx, y + 1.8, z); g.add(rail); } }
   function addTerraces(g, worldX, worldZ) {
     for (let row = 0; row < 7; row++) {
@@ -88,8 +170,16 @@ function boot() {
     const key = `${cx},${cz}`; if (chunks.has(key)) return;
     const g = new THREE.Group(); const worldX = cx * CHUNK, worldZ = cz * CHUNK, b = biomeAt(worldZ);
     const geo = new THREE.PlaneGeometry(CHUNK, CHUNK, 32, 32); geo.rotateX(-Math.PI / 2); const arr = geo.attributes.position.array;
-    for (let i = 0; i < arr.length; i += 3) arr[i + 1] = heightAt(arr[i] + worldX, arr[i + 2] + worldZ);
-    geo.computeVertexNormals(); const groundMat = new THREE.MeshStandardMaterial({ color: b.name.includes('Snow') ? mats.snow.color : b.ground, roughness: .96 }); const ground = new THREE.Mesh(geo, groundMat); ground.position.set(worldX, 0, worldZ); ground.receiveShadow = true; g.add(ground);
+    const gcol = new Float32Array(arr.length);
+    const gbase = new THREE.Color(b.name.includes('Snow') ? mats.snow.color : b.ground), gtmp = new THREE.Color();
+    for (let i = 0; i < arr.length; i += 3) {
+      const wx = arr[i] + worldX, wz = arr[i + 2] + worldZ;
+      arr[i + 1] = heightAt(wx, wz);
+      gtmp.copy(gbase).multiplyScalar(.88 + fbm(wx * .09, wz * .09) * .22);
+      gcol[i] = gtmp.r; gcol[i + 1] = gtmp.g; gcol[i + 2] = gtmp.b;
+    }
+    geo.setAttribute('color', new THREE.BufferAttribute(gcol, 3));
+    geo.computeVertexNormals(); const groundMat = new THREE.MeshStandardMaterial({ color: 0xffffff, vertexColors: true, roughness: .96 }); const ground = new THREE.Mesh(geo, groundMat); ground.position.set(worldX, 0, worldZ); ground.receiveShadow = true; g.add(ground);
     const localRiver = riverCenter(worldZ); if (Math.abs(worldX - localRiver) < CHUNK * .85) { const water = new THREE.Mesh(new THREE.PlaneGeometry(24, CHUNK), mats.water); water.rotateX(-Math.PI / 2); water.position.set(localRiver, .9, worldZ); g.add(water); if (hash(cx, cz) > .52) addBridge(g, localRiver, worldZ + (hash(cz, cx) - .5) * 40); }
     const path = new THREE.Mesh(new THREE.PlaneGeometry(6, CHUNK * 1.1), mats.path); path.rotateX(-Math.PI / 2); path.position.set(worldX + Math.sin(cz * .4) * 16, heightAt(worldX, worldZ) + .12, worldZ); path.rotation.z = Math.sin(cz * .7) * .12; g.add(path);
     for (let i = 0; i < 48; i++) { const x = worldX + (hash(i + cx * 9, cz) - .5) * CHUNK, z = worldZ + (hash(cx, i + cz * 7) - .5) * CHUNK; if (Math.abs(x - riverCenter(z)) < 16 || (b.name.includes('Rice') && Math.abs(x - worldX) < CHUNK * .38 && Math.abs(z - worldZ) < 31)) continue; if (hash(x, z) < .13) addHouse(g, x, z, b); else addTree(g, x, z, b.tree, b.accent); }
