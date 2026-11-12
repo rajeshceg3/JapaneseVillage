@@ -49,12 +49,15 @@ function boot() {
   root.appendChild(renderer.domElement);
 
   const hemi = new THREE.HemisphereLight(0xfff4da, 0x203b4b, 1.9); scene.add(hemi);
-  const sun = new THREE.DirectionalLight(0xffd39c, 3.2); sun.position.set(-120, 160, 80); sun.castShadow = true; sun.shadow.mapSize.set(2048, 2048); scene.add(sun);
-  const sky = new THREE.Mesh(new THREE.SphereGeometry(950, 48, 24), new THREE.ShaderMaterial({ side: THREE.BackSide, uniforms: { t: { value: 0 } }, vertexShader: 'varying vec3 v;void main(){v=position;gl_Position=projectionMatrix*modelViewMatrix*vec4(position,1.0);}', fragmentShader: 'varying vec3 v;uniform float t;void main(){float h=normalize(v).y*.5+.5;vec3 dawn=vec3(1.,.78,.55);vec3 zen=vec3(.34,.62,.88);vec3 night=vec3(.05,.08,.18);vec3 col=mix(dawn,zen,smoothstep(.15,1.,h));col=mix(col,night,smoothstep(.72,1.,sin(t)*.5+.5)*.35);gl_FragColor=vec4(col,1.);}' })); scene.add(sky);
+  const sun = new THREE.DirectionalLight(0xffd39c, 3.2); sun.position.set(-120, 160, 80); sun.castShadow = true; sun.shadow.mapSize.set(2048, 2048);
+  sun.shadow.camera.left = -120; sun.shadow.camera.right = 120; sun.shadow.camera.top = 120; sun.shadow.camera.bottom = -120;
+  sun.shadow.camera.near = 10; sun.shadow.camera.far = 620; sun.shadow.bias = -0.0004; sun.shadow.normalBias = 2;
+  scene.add(sun); scene.add(sun.target);
+  const sky = new THREE.Mesh(new THREE.SphereGeometry(950, 48, 24), new THREE.ShaderMaterial({ side: THREE.BackSide, uniforms: { t: { value: 0 } }, vertexShader: 'varying vec3 v;void main(){v=position;gl_Position=projectionMatrix*modelViewMatrix*vec4(position,1.0);}', fragmentShader: 'varying vec3 v;uniform float t;void main(){float h=normalize(v).y*.5+.5;vec3 dawn=vec3(1.,.78,.55);vec3 zen=vec3(.34,.62,.88);vec3 night=vec3(.05,.08,.18);vec3 col=mix(dawn,zen,smoothstep(.15,1.,h));vec3 sd=normalize(vec3(-.55,.55,.37));float g=pow(max(dot(normalize(v),sd),0.),22.);col+=vec3(1.,.82,.55)*g*.4;col+=dawn*.18*(1.-smoothstep(.05,.32,h));col=mix(col,night,smoothstep(.72,1.,sin(t)*.5+.5)*.35);gl_FragColor=vec4(col,1.);}' })); scene.add(sky);
 
   const mats = {
     trunk: new THREE.MeshStandardMaterial({ color: 0x56351f, roughness: .92 }), roof: new THREE.MeshStandardMaterial({ color: 0x213444, roughness: .78 }), wood: new THREE.MeshStandardMaterial({ color: 0x8c5b36, roughness: .85 }),
-    paper: new THREE.MeshStandardMaterial({ color: 0xfff1d2, emissive: 0xffbd66, emissiveIntensity: .55 }), water: new THREE.MeshPhysicalMaterial({ color: 0x59b4c8, transparent: true, opacity: .68, roughness: .05, metalness: 0, transmission: .25 }),
+    paper: new THREE.MeshStandardMaterial({ color: 0xfff1d2, emissive: 0xffbd66, emissiveIntensity: .55 }), water: new THREE.MeshPhysicalMaterial({ color: 0xffffff, vertexColors: true, transparent: true, opacity: .72, roughness: .05, metalness: 0, transmission: .25 }),
     stone: new THREE.MeshStandardMaterial({ color: 0x8f9288, roughness: 1 }), path: new THREE.MeshStandardMaterial({ color: 0xb29b74, roughness: 1 }), snow: new THREE.MeshStandardMaterial({ color: 0xf0f7f4, roughness: .75 }),
   };
   // Lantern meshes remain in every chunk; only the eight nearest need real
@@ -161,8 +164,13 @@ function boot() {
         positions.setXYZ(i, x, heightAt(x, worldZPoint) + .18, worldZPoint);
       }
       geometry.computeVertexNormals();
-      const terrace = new THREE.Mesh(geometry, new THREE.MeshStandardMaterial({ color: row % 2 ? 0x74a35d : 0x8bb56a, roughness: .35, metalness: .08 }));
+      const paddyWater = row % 3 === 1;
+      const terrace = new THREE.Mesh(geometry, paddyWater
+        ? new THREE.MeshStandardMaterial({ color: 0xa8cfd2, roughness: .08, metalness: .05 })
+        : new THREE.MeshStandardMaterial({ color: row % 2 ? 0x74a35d : 0x8bb56a, roughness: .35, metalness: .08 }));
       terrace.receiveShadow = true; g.add(terrace);
+      const bund = new THREE.Mesh(new THREE.BoxGeometry(CHUNK * .72, .55, .7), mats.path);
+      bund.position.set(worldX, heightAt(worldX, z + 2.9) + .3, z + 2.9); bund.receiveShadow = true; g.add(bund);
     }
   }
 
@@ -180,7 +188,13 @@ function boot() {
     }
     geo.setAttribute('color', new THREE.BufferAttribute(gcol, 3));
     geo.computeVertexNormals(); const groundMat = new THREE.MeshStandardMaterial({ color: 0xffffff, vertexColors: true, roughness: .96 }); const ground = new THREE.Mesh(geo, groundMat); ground.position.set(worldX, 0, worldZ); ground.receiveShadow = true; g.add(ground);
-    const localRiver = riverCenter(worldZ); if (Math.abs(worldX - localRiver) < CHUNK * .85) { const water = new THREE.Mesh(new THREE.PlaneGeometry(24, CHUNK), mats.water); water.rotateX(-Math.PI / 2); water.position.set(localRiver, .9, worldZ); g.add(water); if (hash(cx, cz) > .52) addBridge(g, localRiver, worldZ + (hash(cz, cx) - .5) * 40); }
+    const localRiver = riverCenter(worldZ); if (Math.abs(worldX - localRiver) < CHUNK * .85) {
+      const wgeo = new THREE.PlaneGeometry(24, CHUNK, 8, 1); wgeo.rotateX(-Math.PI / 2);
+      const wpos = wgeo.attributes.position, wcol = new Float32Array(wpos.count * 3);
+      const shore = new THREE.Color(0x8fd4de), deep = new THREE.Color(0x3f96b0), wtmp = new THREE.Color();
+      for (let i = 0; i < wpos.count; i++) { const k = Math.min(1, Math.abs(wpos.getX(i)) / 12); wtmp.copy(deep).lerp(shore, k * k); wcol[i * 3] = wtmp.r; wcol[i * 3 + 1] = wtmp.g; wcol[i * 3 + 2] = wtmp.b; }
+      wgeo.setAttribute('color', new THREE.BufferAttribute(wcol, 3));
+      const water = new THREE.Mesh(wgeo, mats.water); water.position.set(localRiver, .9, worldZ); g.add(water); if (hash(cx, cz) > .52) addBridge(g, localRiver, worldZ + (hash(cz, cx) - .5) * 40); }
     const path = new THREE.Mesh(new THREE.PlaneGeometry(6, CHUNK * 1.1), mats.path); path.rotateX(-Math.PI / 2); path.position.set(worldX + Math.sin(cz * .4) * 16, heightAt(worldX, worldZ) + .12, worldZ); path.rotation.z = Math.sin(cz * .7) * .12; g.add(path);
     for (let i = 0; i < 48; i++) { const x = worldX + (hash(i + cx * 9, cz) - .5) * CHUNK, z = worldZ + (hash(cx, i + cz * 7) - .5) * CHUNK; if (Math.abs(x - riverCenter(z)) < 16 || (b.name.includes('Rice') && Math.abs(x - worldX) < CHUNK * .38 && Math.abs(z - worldZ) < 31)) continue; if (hash(x, z) < .13) addHouse(g, x, z, b); else addTree(g, x, z, b.tree, b.accent); }
     for (let i = 0; i < 10; i++) if (hash(cx * 31 + i, cz) > .42) addLantern(g, worldX + (i - 4.5) * 8, worldZ + Math.sin(i + cz) * 13);
@@ -225,6 +239,8 @@ function boot() {
     if (!reducedMotion.matches) fireflies.forEach((p, i) => { p.position.x += Math.sin(t * 2 + i) * .018; p.position.y += Math.sin(t * 3 + i) * .012; p.position.z += .18; if (p.position.z - camera.position.z > 130) p.position.z -= 260; p.material.opacity = .35 + Math.sin(t * 4 + i) * .25; });
     if (!reducedMotion.matches) petals.forEach((p, i) => { p.position.x += Math.sin(t + i) * .04; p.position.y -= .012; p.position.z += .1; if (p.position.y < heightAt(p.position.x, p.position.z) + 2) p.position.y += 42; if (p.position.z - camera.position.z > 130) p.position.z -= 260; });
     sky.position.copy(camera.position);
+    sun.position.set(camera.position.x - 120, 160, camera.position.z + 80);
+    sun.target.position.set(camera.position.x, 0, camera.position.z); sun.target.updateMatrixWorld();
     const nearest = [...lanternPositions.values()].flat().sort((a,b) => a.distanceToSquared(camera.position) - b.distanceToSquared(camera.position));
     lightPool.forEach((light, i) => { light.visible = Boolean(nearest[i]); if (nearest[i]) light.position.copy(nearest[i]); });
     renderer.domElement.dataset.camera = camera.position.toArray().map(n => n.toFixed(1)).join(',');
