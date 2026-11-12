@@ -207,8 +207,22 @@ function boot() {
   addEventListener('keyup', e => keys[e.key.toLowerCase()] = false);
   renderer.domElement.addEventListener('click', () => renderer.domElement.requestPointerLock?.());
   addEventListener('mousemove', e => { if (document.pointerLockElement === renderer.domElement) yaw -= e.movementX * .0022; });
-  for (let i = 0; i < 90; i++) { const bird = new THREE.Mesh(new THREE.ConeGeometry(.7, 2.2, 3), new THREE.MeshStandardMaterial({ color: 0x1b2028 })); bird.position.set((hash(i, 1) - .5) * 480, 58 + hash(i, 2) * 55, (hash(i, 3) - .5) * 540); birds.push(bird); scene.add(bird); }
-  for (let i = 0; i < 160; i++) { const p = new THREE.Mesh(new THREE.SphereGeometry(.08 + hash(i, 4) * .1, 6, 4), new THREE.MeshBasicMaterial({ color: i % 2 ? 0xffe891 : 0xf0a6bd, transparent: true, opacity: .75 })); p.position.set((hash(i, 5) - .5) * 240, 8 + hash(i, 6) * 40, (hash(i, 7) - .5) * 260); (i % 2 ? fireflies : petals).push(p); scene.add(p); }
+  const birdBody = new THREE.ConeGeometry(.34, 1.7, 6); birdBody.rotateX(Math.PI / 2); birdBody.scale(1, .55, 1);
+  const birdWingL = new THREE.PlaneGeometry(1.6, .55); birdWingL.rotateX(-Math.PI / 2); birdWingL.rotateZ(.32); birdWingL.translate(-.85, .14, 0);
+  const birdWingR = new THREE.PlaneGeometry(1.6, .55); birdWingR.rotateX(-Math.PI / 2); birdWingR.rotateZ(-.32); birdWingR.translate(.85, .14, 0);
+  const birdGeo = mergeGeometries([birdBody, birdWingL, birdWingR].map(p2 => p2.index ? p2.toNonIndexed() : p2));
+  const birdMat = new THREE.MeshBasicMaterial({ color: 0x1b2028, side: THREE.DoubleSide });
+  for (let i = 0; i < 90; i++) { const bird = new THREE.Mesh(birdGeo, birdMat); bird.position.set((hash(i, 1) - .5) * 480, 58 + hash(i, 2) * 55, (hash(i, 3) - .5) * 540); birds.push(bird); scene.add(bird); }
+  const petalGeo = new THREE.SphereGeometry(.16, 6, 4); petalGeo.scale(1, .26, .72);
+  const petalMat = new THREE.MeshBasicMaterial({ color: 0xf0a6bd, transparent: true, opacity: .85 });
+  const fireflyGeos = [new THREE.SphereGeometry(.07, 6, 4), new THREE.SphereGeometry(.11, 6, 4), new THREE.SphereGeometry(.15, 6, 4)];
+  const fireflyMats = [new THREE.MeshBasicMaterial({ color: 0xffe891, transparent: true, opacity: .78 }), new THREE.MeshBasicMaterial({ color: 0xffd27a, transparent: true, opacity: .72 })];
+  for (let i = 0; i < 160; i++) {
+    let p;
+    if (i % 2) { p = new THREE.Mesh(fireflyGeos[i % 3], fireflyMats[hash(i, 11) > .5 ? 1 : 0]); fireflies.push(p); }
+    else { p = new THREE.Mesh(petalGeo, petalMat); p.rotation.set(hash(i, 8) * 3, hash(i, 9) * 3, hash(i, 10) * 3); petals.push(p); }
+    p.position.set((hash(i, 5) - .5) * 240, 8 + hash(i, 6) * 40, (hash(i, 7) - .5) * 260); scene.add(p);
+  }
 
   let yaw = 0, t = 0, lastFrame = performance.now();
   const reducedMotion = matchMedia('(prefers-reduced-motion: reduce)');
@@ -235,9 +249,9 @@ function boot() {
     const cx = Math.floor(camera.position.x / CHUNK), cz = Math.floor(camera.position.z / CHUNK); for (let x = cx - VIEW; x <= cx + VIEW; x++) for (let z = cz - VIEW; z <= cz + VIEW; z++) makeChunk(x, z);
     for (const [k, g] of chunks) { const [x, z] = k.split(',').map(Number); if (Math.abs(x - cx) > VIEW + 1 || Math.abs(z - cz) > VIEW + 1) { scene.remove(g); chunks.delete(k); lanternPositions.delete(g); g.traverse(object => { if (object.isMesh) { object.geometry.dispose(); if (!Object.values(mats).includes(object.material)) object.material.dispose(); } }); } }
     const b = biomeAt(camera.position.z); const nextPlace=biomes.indexOf(b);if(nextPlace!==soundPlace){soundPlace=nextPlace;ambience.setPlace(soundPlace)} updateHud(b); scene.fog.color.lerp(new THREE.Color(b.fog), .012); renderer.setClearColor(scene.fog.color);
-    if (!reducedMotion.matches) birds.forEach((bird, i) => { bird.position.x += Math.sin(t + i) * .08; bird.position.z += .26; if (bird.position.z - camera.position.z > 280) bird.position.z -= 560; bird.rotation.y = Math.sin(t + i); });
-    if (!reducedMotion.matches) fireflies.forEach((p, i) => { p.position.x += Math.sin(t * 2 + i) * .018; p.position.y += Math.sin(t * 3 + i) * .012; p.position.z += .18; if (p.position.z - camera.position.z > 130) p.position.z -= 260; p.material.opacity = .35 + Math.sin(t * 4 + i) * .25; });
-    if (!reducedMotion.matches) petals.forEach((p, i) => { p.position.x += Math.sin(t + i) * .04; p.position.y -= .012; p.position.z += .1; if (p.position.y < heightAt(p.position.x, p.position.z) + 2) p.position.y += 42; if (p.position.z - camera.position.z > 130) p.position.z -= 260; });
+    if (!reducedMotion.matches) birds.forEach((bird, i) => { bird.position.x += Math.sin(t * .5 + i) * .06; bird.position.y += Math.sin(t * 2.6 + i * 1.7) * .045; bird.position.z += .26; if (bird.position.z - camera.position.z > 280) bird.position.z -= 560; bird.rotation.z = Math.sin(t * .9 + i) * .18; bird.rotation.y = Math.sin(t * .3 + i) * .1; });
+    if (!reducedMotion.matches) fireflies.forEach((p, i) => { p.position.x += Math.sin(t * 2 + i) * .018; p.position.y += Math.sin(t * 3 + i) * .012; p.position.z += .18; if (p.position.z - camera.position.z > 130) p.position.z -= 260; p.scale.setScalar(.72 + Math.sin(t * 4 + i) * .28); });
+    if (!reducedMotion.matches) petals.forEach((p, i) => { p.position.x += Math.sin(t + i) * .04; p.position.y -= .012; p.position.z += .1; p.rotation.x += .013; p.rotation.z += .009; if (p.position.y < heightAt(p.position.x, p.position.z) + 2) p.position.y += 42; if (p.position.z - camera.position.z > 130) p.position.z -= 260; });
     sky.position.copy(camera.position);
     sun.position.set(camera.position.x - 120, 160, camera.position.z + 80);
     sun.target.position.set(camera.position.x, 0, camera.position.z); sun.target.updateMatrixWorld();
