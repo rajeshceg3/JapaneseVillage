@@ -58,7 +58,7 @@ body[data-chrome="off"] .places {
 }
 body[data-chrome="off"] .chrome-hint {
   display: grid;
-  animation: hint-sway 4s ease-in-out infinite;
+  
 }
 .chrome-hint .ink-chochin {
   width: 30px;
